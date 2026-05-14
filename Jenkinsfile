@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    tools {
+        maven 'maven.15'
+    }
 
     environment {
         NEXUS_USER = 'admin'
