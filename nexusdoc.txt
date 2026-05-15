@@ -1,39 +1,99 @@
-MANUAL INSTALLATION:
+SONATYPE NEXUS:
+===============
+Nexus is a opens source software .it is an artifactory repo used to store the build artifacts and retrive them whenever required 
+
+for java artifacts ---jar, war, ear
+
+for node js   --- npm packages
+
+docker --- docker images
+
+and also we can store some common dependencies which are useful for alll the projects.
+
+
+for maven projects 
+
+Hosted repository: A hosted repository in Sonatype Nexus Repository Manager is used to store artifacts that are created within your organization. After Jenkins builds an application, artifacts such as JARs, WARs, or Docker images are uploaded here for versioning and future deployments. In short, it stores internally built packages.
+
+Proxy repository: A proxy repository acts as an intermediary between your environment and external repositories such as Apache Maven Central. When developers request external dependencies, Nexus downloads them once from the internet, caches them locally, and serves future requests from cache. This improves build speed, reduces internet dependency, and gives better control over external packages.
+
+Group repository: A group repository combines multiple hosted and proxy repositories into a single endpoint. Instead of configuring developers or CI pipelines with multiple repository URLs, they use one group repository URL, and Nexus automatically fetches artifacts from the appropriate underlying repository. It simplifies repository management and provides a single access point.
+
+=====================================================================================================
+Snapshot repository: A snapshot repository stores unstable or in-development versions of artifacts that are frequently updated during development. These versions usually have names like 1.0-SNAPSHOT, indicating that the build is not final and may change with every new commit or build triggered by Jenkins. It is mainly used for continuous integration and testing phases where developers need the latest build updates.
+
+Release repository: A release repository stores stable, finalized versions of artifacts that are ready for production use. These versions follow fixed version numbers such as 1.0, 2.1, etc., and once uploaded, they typically should not be modified. After code passes validation steps like SonarQube Community Build checks and testing, the final artifact is pushed to the release repository for deployment.
+
+
+NEXUS INSTALLATION:
 ====================
 server requirements:
 ubuntu t2.medium 4 gib server
 enable port 8081 
 nexus default port is 8081
 
-JAVA INSTALLATION:
+CONECT TO INSTANCE:
 
-sudo apt update
-sudo apt install -y openjdk-17-jdk wget tar
+sudo su -
 
+CREATE nexus.sh
 
-Create Nexus User and Directories
+vi nexus.sh  ----it will open one file
 
-sudo useradd -M -d /opt/nexus -s /bin/bash nexus
-sudo mkdir -p /opt/nexus /opt/sonatype-work
-sudo chown -R nexus:nexus /opt/nexus /opt/sonatype-work
+NOW COPY THE FOLLOWING CONTENT TILL THIS LINE(echo "sudo cat /opt/sonatype-work/nexus3/admin.password")
 
-Download and Extract Nexus
+===================================================================================
+#!/bin/bash
 
+set -e
+
+NEXUS_VERSION="3.79.1-04"
+NEXUS_USER="nexus"
+NEXUS_HOME="/opt/nexus"
+NEXUS_WORK="/opt/sonatype-work"
+
+echo "========== SYSTEM UPDATE =========="
+sudo apt update -y
+
+echo "========== INSTALL JAVA 21 =========="
+sudo apt install -y openjdk-21-jdk wget tar unzip curl ufw
+
+java -version
+
+echo "========== CREATE NEXUS USER =========="
+if id "$NEXUS_USER" &>/dev/null; then
+    echo "User exists"
+else
+    sudo useradd -M -d $NEXUS_HOME -s /bin/bash $NEXUS_USER
+fi
+
+echo "========== CLEAN OLD SETUP =========="
+sudo systemctl stop nexus || true
+sudo rm -rf $NEXUS_HOME
+sudo rm -rf /tmp/nexus*
+
+echo "========== CREATE DIRECTORIES =========="
+sudo mkdir -p $NEXUS_HOME
+sudo mkdir -p $NEXUS_WORK
+
+echo "========== DOWNLOAD NEXUS =========="
 cd /tmp
-wget https://download.sonatype.com/nexus/3/nexus-3.79.1-04-linux-x86_64.tar.gz
-tar -xvzf nexus-3.79.1-04-linux-x86_64.tar.gz
+wget https://download.sonatype.com/nexus/3/nexus-${NEXUS_VERSION}-linux-x86_64.tar.gz
 
-Move Nexus Files to /opt/nexus
+echo "========== EXTRACT =========="
+tar -xvzf nexus-${NEXUS_VERSION}-linux-x86_64.tar.gz
 
-sudo mv nexus-3.79.1-04/* /opt/nexus/
-sudo chown -R nexus:nexus /opt/nexus
+echo "========== MOVE FILES =========="
+sudo mv nexus-${NEXUS_VERSION}/* $NEXUS_HOME/
 
-Set Nexus to Run as 'nexus' User
+echo "========== SET PERMISSIONS =========="
+sudo chown -R $NEXUS_USER:$NEXUS_USER $NEXUS_HOME
+sudo chown -R $NEXUS_USER:$NEXUS_USER $NEXUS_WORK
 
-echo 'run_as_user="nexus"' | sudo tee /opt/nexus/bin/nexus.rc
+echo "========== CONFIGURE RUN USER =========="
+echo "run_as_user=\"$NEXUS_USER\"" | sudo tee $NEXUS_HOME/bin/nexus.rc
 
-Create systemd Service File
-
+echo "========== SYSTEMD SERVICE =========="
 sudo tee /etc/systemd/system/nexus.service > /dev/null <<EOF
 [Unit]
 Description=Nexus Repository Manager
@@ -42,73 +102,101 @@ After=network.target
 [Service]
 Type=forking
 LimitNOFILE=65536
-User=nexus
-Group=nexus
-ExecStart=/opt/nexus/bin/nexus start
-ExecStop=/opt/nexus/bin/nexus stop
+User=$NEXUS_USER
+Group=$NEXUS_USER
+ExecStart=$NEXUS_HOME/bin/nexus start
+ExecStop=$NEXUS_HOME/bin/nexus stop
 Restart=on-abort
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-Enable and Start Nexus as a Service
+echo "========== OPEN PORT =========="
+sudo ufw allow 8081/tcp || true
+sudo ufw --force enable || true
 
+echo "========== START NEXUS =========="
 sudo systemctl daemon-reload
 sudo systemctl enable nexus
-sudo systemctl start nexus
-JUST CHECK STATUS 
+sudo systemctl restart nexus
 
-sudo systemctl status nexus  ---> it should be up and running
+echo "Waiting for startup..."
+sleep 60
+
+echo "========== STATUS =========="
+sudo systemctl status nexus --no-pager
+
+SERVER_IP=$(curl -s ifconfig.me)
+
+echo ""
+echo "=============================================="
+echo " Nexus Installed Successfully"
+echo " URL: http://$SERVER_IP:8081"
+echo ""
+echo " Admin Password:"
+echo " sudo cat /opt/sonatype-work/nexus3/admin.password"
+echo "=============================================="
+
+=================================================================================
+NOW SAVE FILE  (press Esc -->type :wq --enter)
+
+GIVE EXCUTE PERMISSION TO FILE
+ chmod +x nexus.sh
+
+RUN THE SCRIPT
+ bash nexus.sh
+
+TO CHECK NEXUS IS UP AND RUNNING OR NOT
+ systemctl status jenkins
+
+it will show running
+
+NOW ACCESS THIS IN WEB PAGE:
 
 http://<your-server-ip>:8081
+sign in 
+useername : admin
+password: at sudo cat /opt/sonatype-work/nexus3/admin.password ----------> RUN THIS COMMAND IN COMMAND PROMPT
 
-username: admin
-password: get from below command
-sudo cat /opt/sonatype-work/nexus3/admin.password
+COPY THE PASSWORD AND PASTE IN LOG IN PAGE 
+ 
+ NOW 
+change password
+
+
+
+
 
 NOW CREATE A REPO:
 
-CREATE REPOSITORY---->settings -->repository--->create repo--> slect maven2(hosted)
-repo name:
-version policy: select (mixed)
-deployment policy: allow redeploy
-now keep remaining deatails as it is
-
----> click on create repository
+CREATE REPOSITORY---->settings -->repository--->create repo
 
 
- NOW CONNECT TO JENKINS SERVER COMMAND PROMPT
-SETTING UP settings.xml
-
+SETTING UP settings.xml (in jenkins serve )
 (/var/lib/jenkins/.m2/settings.xml)
 
-TO GO TO JENKINS DEFAULT HOME PATH
+install plugin nexus artifact uploader in jenkins ui from plugin section
+
+now connect to jenkins server  
 
 cd /var/lib/jenkins
 
-CREATE .m2 directory                    -----it is ahidden directory
-sudo mkdir -p .m2                       ----->it creates .m2 directory
-sudo chown -R jenkins:jenkins .m2       ----->it changes ownership of user and group to jenkins
+sudo mkdir -p .m2 ----->it creates .m2 directory
 
-GO TO .m2 directory
+sudo chown -R jenkins:jenkins .m2
 
 cd .m2
 
-IN .m2 DIRECTORY CREATE settings.xml file
-
 sudo vi settings.xml
-
-COPY THE FOLLOWING CONTENT AND PASTE settings.xml file
-
--------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
     
     <servers>
         <server>
-            <id>nexus-maven-snapshot-repo</id>
+            <id>grithika-labs-repo</id>
             <username>admin</username>
             <password>admin</password>
         </server>
@@ -119,7 +207,7 @@ COPY THE FOLLOWING CONTENT AND PASTE settings.xml file
         <mirror>
             <id>nexus</id>
             <mirrorOf>*</mirrorOf>
-            <url>http://13.127.242.63:8081/repository/maven-public/</url>
+            <url>http://98.130.60.51:8081/repository/maven-public/</url>
         </mirror>
     </mirrors>
 
@@ -129,7 +217,7 @@ COPY THE FOLLOWING CONTENT AND PASTE settings.xml file
             <repositories>
                 <repository>
                     <id>central</id>
-                    <url>http://13.127.242.63:8081/repository/maven-central/</url>
+                    <url>http://98.130.60.51:8081/repository/maven-central/</url>
                     <releases><enabled>true</enabled></releases>
                     <snapshots><enabled>true</enabled></snapshots>
                 </repository>
@@ -137,7 +225,7 @@ COPY THE FOLLOWING CONTENT AND PASTE settings.xml file
             <pluginRepositories>
                 <pluginRepository>
                     <id>central</id>
-                    <url>http://13.127.242.63:8081/repository/maven-central/</url>
+                    <url>http://98.130.60.51:8081/repository/maven-central/</url>
                     <releases><enabled>true</enabled></releases>
                     <snapshots><enabled>true</enabled></snapshots>
                 </pluginRepository>
@@ -150,46 +238,22 @@ COPY THE FOLLOWING CONTENT AND PASTE settings.xml file
     </activeProfiles>
 
 </settings>
--------------------------------------------------------------------------------------------------------------------
 
-TO  SAVE THE FILE CLICK ON ESCAPE AND TYPE :wq! AND ENTER
-
-
-NOW GO TO JENKINS UI  AND DO FOLLOWING STEPS
-
-TO INTEGRATE nexus MANUALLY WE NEED TO INSTALL PLUG IN CALLED NEXUS ARTIFACT UPLOADER
-
-NEXT GO TO MANAGE JENKINS ---> CREDENTIALS ---> GLOBAL ---> ADD NEXUS CREDENTIALS WITH USER NAME AND PASSWORD
-
-NOW CREATE NEW PIPELINE JOB WITH PIPELINE SCRIPT FROM SCM OPTION
-
-(FOR PRACTICE  FORK REPO FROM umamahesh571/springboot.4.0)
-
-
-
-POINTS TO REMEBER:
-
-BEFORE BUILDING THE JOB PLEASE MAKE SURE Jenkinsfile IS UPDATED WITH YOUR NEXUS REPO URL
-
-AND ALSO UPDATE pom.xml AND settings.xml  WITH YOUR NEXUS SERVER PUBLIC IP AND URL IN THEIR RESPECTIVE PLACES
-
-IN PIPELINE SCRIPT IN CHECK OUT STAGE PLEASE GIVE YOUR GITHUB REPO URL
-
-
-ONCE YOU ARE DONE WITH ALL THIS STEPS  NOW TRY TO BUILD YOUR JENKINS JOB 
-
-ONCE JOB IS EXCUTED YOU  CAN SEE ARTIFACT IN NEXUS REPO 
+-------------------------------------------------------------------------------------------------
 
 pipeline script:
 
 
 pipeline {
     agent any
+    tools {
+       maven 'maven.15'
+    }
 
     environment {
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'admin'
-        NEXUS_REPO_URL = 'http://13.127.242.63:8081/repository/maven-snapshot-repo/'
+        NEXUS_REPO_URL = 'http://13.201.36.207:8081/repository/maven-release-repo'
         GROUP_ID = 'com.evolve'
         ARTIFACT_ID = 'evolve-technologies'
         VERSION = '1.0'
@@ -200,7 +264,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/umamahesh571/springboot.4.0.git', branch: 'main'
+                git url: 'https://github.com/umamahesh571/repo-name', branch: 'main'
             }
         }
 
@@ -234,3 +298,40 @@ pipeline {
         }
     }
 }
+
+
+
+now create pipe line project : 
+
+pipline script from scm :git ---JENKINS FILE
+
+
+
+POINTS TO REMEMBER:
+
+WHEN WE ARE REUSING settings.xml FILE ,POM.XML AND PIPELINE SCRIPT
+WE NEED TO UPDATE IP ADDRESS IN ALL THESE FILES 
+
+ROLES OF DEVOPS ENGINEER IN NEXUS:
+
+As a DevOps engineer, your role with Sonatype Nexus Repository Manager is usually around managing artifacts and integrating Nexus into CI/CD pipelines, not developing application code.
+
+Repository Management: You create and manage repositories such as hosted, proxy, and group repositories based on project requirements. For example, creating snapshot and release repositories for internal artifacts and proxy repositories for external dependencies.
+
+CI/CD Integration: You integrate Jenkins pipelines with Nexus so that once the build is completed, artifacts like JARs, WARs, or Docker images are automatically pushed to Nexus.
+
+Artifact Versioning: You ensure proper version control of artifacts by managing snapshot and release versions, helping teams track builds and perform rollbacks when needed.
+
+Access Management: You configure users, roles, and permissions so that only authorized teams can upload, download, or manage artifacts.
+
+Dependency Optimization: You configure proxy repositories to cache dependencies from external sources like Apache Maven Central, reducing build time and minimizing internet dependency.
+
+Storage Maintenance: You monitor disk utilization, clean unused artifacts, configure retention policies, and maintain repository health.
+
+Backup and Recovery: You ensure Nexus data is backed up regularly so artifacts are not lost during failures.
+
+Security & Compliance: You may integrate Nexus with vulnerability scanning tools and ensure only approved artifacts are used in deployments.
+
+Deployment Support: During deployments, you ensure teams pull the correct artifact version from Nexus instead of rebuilding the application again.
+
+In short, as a DevOps engineer, Nexus becomes your central artifact management system in the CI/CD pipeline.
