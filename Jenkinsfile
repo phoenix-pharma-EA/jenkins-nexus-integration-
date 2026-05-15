@@ -7,7 +7,7 @@ pipeline {
     environment {
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'admin'
-        NEXUS_REPO_URL = 'http://47.130.152.158:8081/repository/maven-snapshot-1/'
+        NEXUS_REPO_URL = 'http://16.112.31.119:8081/repository/grithikalabs-central-repo/'
         GROUP_ID = 'com.evolve'
         ARTIFACT_ID = 'evolve-technologies'
         VERSION = '2.0'
