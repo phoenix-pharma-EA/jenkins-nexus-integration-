@@ -3,7 +3,9 @@ pipeline {
     tools {
         maven 'maven.15'
     }
-
+    environment {
+        SONARQUBE_ENV = 'SonarQube' // Must match Jenkins SonarQube config name
+    }
     environment {
         NEXUS_USER = 'admin'
         NEXUS_PASS = '6459'
