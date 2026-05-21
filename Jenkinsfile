@@ -7,7 +7,7 @@ pipeline {
     environment {
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'admin'
-        NEXUS_REPO_URL = 'http://98.130.60.51:8081/repository/grithika-labs-repo/'
+        NEXUS_REPO_URL = 'http://3.236.193.71:8081/repository/phoenix-pharma-repo/'
         GROUP_ID = 'com.evolve'
         ARTIFACT_ID = 'evolve-technologies'
         VERSION = '2.0'
