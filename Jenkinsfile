@@ -5,8 +5,6 @@ pipeline {
     }
     environment {
         SONARQUBE_ENV = 'SonarQube' // Must match Jenkins SonarQube config name
-    }
-    environment {
         NEXUS_USER = 'admin'
         NEXUS_PASS = '6459'
         NEXUS_REPO_URL = 'http://3.236.193.71:8081/repository/phoenix-pharma-repo/'
