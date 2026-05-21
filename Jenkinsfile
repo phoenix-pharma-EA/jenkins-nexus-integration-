@@ -23,7 +23,13 @@ pipeline {
                 git url: 'https://github.com/phoenix-pharma-EA/jenkins-nexus-integration-.git', branch: 'main'
             }
         }
-
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv("${SONARQUBE_ENV}") {
+                    sh 'mvn clean verify sonar:sonar'
+                }
+            }
+        }
         stage('Build WAR') {
             steps {
                 sh 'mvn  package -DskipTests'
